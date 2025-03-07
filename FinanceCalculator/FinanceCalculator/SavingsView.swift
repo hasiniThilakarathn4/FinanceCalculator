@@ -1,85 +1,128 @@
 import SwiftUI
 
 struct SavingsView: View {
-    @State private var principal: String = ""
-    @State private var monthlyContribution: String = ""
-    @State private var rate: String = ""
-    @State private var years: String = ""
-    @State private var result: Double?
+    enum SolveFor: String, CaseIterable, Identifiable {
+        case futureValue, monthlyContribution, interestRate, duration
 
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 20) {
-                    
-                    // Title
-                    Text("Savings Calculator")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .padding(.top, 10)
-
-                    // Input Section
-                    VStack(spacing: 15) {
-                        CustomTextField(placeholder: "Initial Investment ($)", text: $principal)
-                        CustomTextField(placeholder: "Monthly Contribution ($)", text: $monthlyContribution)
-                        CustomTextField(placeholder: "Annual Interest Rate (%)", text: $rate)
-                        CustomTextField(placeholder: "Years", text: $years)
-                    }
-                    .padding()
-                    .background(RoundedRectangle(cornerRadius: 10).fill(Color(.systemGray6))) // Form-like UI
-                    .padding(.horizontal)
-
-                    // Calculation Result
-                    if let result = result {
-                        VStack {
-                            Text("Future Value")
-                                .font(.headline)
-                                .foregroundColor(.gray)
-                            
-                            Text("$\(result, specifier: "%.2f")")
-                                .font(.title)
-                                .fontWeight(.bold)
-                                .foregroundColor(.blue)
-                        }
-                        .padding()
-                        .background(RoundedRectangle(cornerRadius: 10).fill(Color(.systemGray6))) // Result Box
-                        .padding(.horizontal)
-                    }
-
-                    // Calculate Button
-                    Button(action: calculateFutureValue) {
-                        Text("Calculate")
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(Color.blue)
-                            .foregroundColor(.white)
-                            .cornerRadius(10)
-                            .font(.headline)
-                    }
-                    .padding(.horizontal)
-                    
-                    Spacer()
-                }
-                .padding()
-            }
-            .navigationTitle("Savings Calculator")
-            .background(Color(.systemBackground))
-            .onTapGesture {
-                hideKeyboard()
+        var id: Self { self }
+        var displayName: String {
+            switch self {
+            case .futureValue: return "Future Value"
+            case .monthlyContribution: return "Monthly Contribution"
+            case .interestRate: return "Interest Rate"
+            case .duration: return "Duration"
             }
         }
     }
 
-    private func calculateFutureValue() {
-        guard let p = Double(principal),
-              let m = Double(monthlyContribution),
-              let r = Double(rate),
-              let t = Double(years) else { return }
+    @State private var solveFor: SolveFor = .futureValue
 
-        let i = r / 100 / 12
-        let n = t * 12
-        let futureValue = (m * (pow(1 + i, n) - 1) / i) + (p * pow(1 + i, n))
+    @State private var principal = ""
+    @State private var monthlyContribution = ""
+    @State private var rate = ""
+    @State private var years = ""
+    @State private var futureValue = ""
 
-        result = futureValue
+    @State private var result: Double?
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                ThemeManager.backgroundGradient.ignoresSafeArea()
+
+                ScrollView {
+                    VStack(spacing: 20) {
+
+                        Picker("Solve For", selection: $solveFor) {
+                            ForEach(SolveFor.allCases) { option in
+                                Text(option.displayName).tag(option)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .padding(.horizontal)
+
+                        VStack(spacing: 15) {
+                            CustomTextField(title: "Initial Investment", placeholder: "$0.00", text: $principal)
+
+                            if solveFor != .monthlyContribution {
+                                CustomTextField(title: "Monthly Contribution", placeholder: "$0.00", text: $monthlyContribution)
+                            }
+
+                            if solveFor != .interestRate {
+                                CustomTextField(title: "Annual Interest Rate (%)", placeholder: "0%", text: $rate)
+                            }
+
+                            if solveFor != .duration {
+                                CustomTextField(title: "Duration (Years)", placeholder: "Years", text: $years)
+                            }
+
+                            if solveFor != .futureValue {
+                                CustomTextField(title: "Future Value", placeholder: "$0.00", text: $futureValue)
+                            }
+                        }
+                        .cardBackground()
+
+                        if let result = result {
+                            ResultView(title: solveFor.displayName, value: formattedResult(result))
+                        }
+
+                        HStack(spacing: 15) {
+                            Button(action: calculate) {
+                                PrimaryButton(title: "Calculate")
+                            }
+
+                            Button(action: resetFields) {
+                                PrimaryButton(title: "Reset")
+                            }
+                        }
+                        .padding(.horizontal)
+
+                        Spacer()
+                    }
+                    .padding()
+                }
+                .navigationTitle("💰 Savings Calculator")
+                .onTapGesture { hideKeyboard() }
+            }
+        }
+    }
+
+    private func calculate() {
+        let p = Double(principal) ?? 0
+        let m = Double(monthlyContribution) ?? 0
+        let r = (Double(rate) ?? 0) / 100 / 12
+        let t = (Double(years) ?? 0) * 12
+        let fv = Double(futureValue) ?? 0
+
+        switch solveFor {
+        case .futureValue:
+            result = (m * (pow(1 + r, t) - 1) / r) + (p * pow(1 + r, t))
+        case .monthlyContribution:
+            result = (fv - p * pow(1 + r, t)) * r / (pow(1 + r, t) - 1)
+        case .interestRate:
+            result = (pow(fv / (p + m * t), 1 / t) - 1) * 12 * 100
+        case .duration:
+            result = log((fv * r + m) / (p * r + m)) / log(1 + r) / 12
+        }
+    }
+
+    private func formattedResult(_ value: Double) -> String {
+        switch solveFor {
+        case .interestRate:
+            return String(format: "%.2f%%", value * 100)
+        case .duration:
+            return String(format: "%.1f years", value / 12)
+        default:
+            return String(format: "$%.2f", value)
+        }
+    }
+
+    private func resetFields() {
+        principal = ""
+        monthlyContribution = ""
+        rate = ""
+        years = ""
+        futureValue = ""
+        result = nil
     }
 }

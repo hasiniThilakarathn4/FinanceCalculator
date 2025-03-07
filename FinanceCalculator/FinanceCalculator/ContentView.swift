@@ -104,13 +104,6 @@ struct ContentView: View {
     }
 }
 
-// Function to hide keyboard
-extension View {
-    func hideKeyboard() {
-        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-    }
-}
-
 #Preview {
     ContentView()
 }

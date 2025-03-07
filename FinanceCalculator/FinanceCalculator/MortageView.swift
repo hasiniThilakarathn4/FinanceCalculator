@@ -1,82 +1,118 @@
+//
+//  MortgageView.swift
+//  FinanceCalculator
+//
+//  Created by Hasini Thilakarathna on 2025-02-28.
+//
 import SwiftUI
 
 struct MortgageView: View {
-    @State private var loanAmount: String = ""
-    @State private var rate: String = ""
-    @State private var years: String = ""
+    enum SolveFor: String, CaseIterable, Identifiable {
+        case monthlyPayment = "Monthly Payment"
+        case loanAmount = "Loan Amount"
+        case interestRate = "Interest Rate"
+        case loanTerm = "Loan Term"
+
+        var id: String { self.rawValue }
+    }
+
+    @State private var solveFor: SolveFor = .monthlyPayment
+    @State private var loanAmount = ""
+    @State private var rate = ""
+    @State private var years = ""
+    @State private var monthlyPayment = ""
     @State private var result: Double?
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 20) {
-                    
-                    // Title
-                    Text("Mortgage Calculator")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .padding(.top, 10)
+            ZStack {
+                ThemeManager.backgroundGradient.edgesIgnoringSafeArea(.all)
+                ScrollView {
+                    VStack(spacing: 20) {
 
-                    // Input Section
-                    VStack(spacing: 15) {
-                        CustomTextField(placeholder: "Loan Amount ($)", text: $loanAmount)
-                        CustomTextField(placeholder: "Annual Interest Rate (%)", text: $rate)
-                        CustomTextField(placeholder: "Loan Term (Years)", text: $years)
+                        Picker("Solve for", selection: $solveFor) {
+                            ForEach(SolveFor.allCases) { option in
+                                Text(option.rawValue).tag(option)
+                            }
+                        }
+                        .pickerStyle(SegmentedPickerStyle())
+                        .padding()
+
+                        InputSection {
+                            if selectedSolveFor != .monthlyPayment {
+                                CustomTextField(title: "Monthly Payment", placeholder: "$0.00", text: $monthlyPayment)
+                            }
+                            if selectedSolveFor != .loanAmount {
+                                CustomTextField(title: "Loan Amount", placeholder: "$0.00", text: $loanAmount)
+                            }
+                            if selectedSolveFor != .interestRate {
+                                CustomTextField(title: "Interest Rate (%)", placeholder: "%", text: $rate)
+                            }
+                            if selectedSolveFor != .loanTerm {
+                                CustomTextField(title: "Loan Duration (Years)", placeholder: "Years", text: $years)
+                            }
+                        }
+                        .cardBackground()
+
+                        if let result = result {
+                            ResultView(title: selectedSolveFor.rawValue, value: String(format: "$%.2f", result))
+                        }
+
+                        HStack(spacing: 15) {
+                            Button(action: calculateMortgage) {
+                                PrimaryButton(title: "Calculate")
+                            }
+
+                            Button(action: resetFields) {
+                                PrimaryButton(title: "Reset")
+                            }
+                        }
+                        .padding(.horizontal)
+
+                        Spacer()
                     }
                     .padding()
-                    .background(RoundedRectangle(cornerRadius: 10).fill(Color(.systemGray6)))
-                    .padding(.horizontal)
-
-                    // Calculation Result
-                    if let result = result {
-                        VStack {
-                            Text("Monthly Payment")
-                                .font(.headline)
-                                .foregroundColor(.gray)
-                            
-                            Text("$\(result, specifier: "%.2f")")
-                                .font(.title)
-                                .fontWeight(.bold)
-                                .foregroundColor(.blue)
-                        }
-                        .padding()
-                        .background(RoundedRectangle(cornerRadius: 10).fill(Color(.systemGray6))) // Result Box
-                        .padding(.horizontal)
-                    }
-
-                    // Calculate Button
-                    Button(action: calculateMortgage) {
-                        Text("Calculate")
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(Color.blue)
-                            .foregroundColor(.white)
-                            .cornerRadius(10)
-                            .font(.headline)
-                    }
-                    .padding(.horizontal)
-                    
-                    Spacer()
                 }
-                .padding()
-            }
-            .navigationTitle("Mortgage Calculator")
-            .background(Color(.systemBackground))
-            .onTapGesture {
-                hideKeyboard()
+                .navigationTitle("🏡 Mortgage Calculator")
+                .onTapGesture {
+                    hideKeyboard()
+                }
             }
         }
     }
 
+    @State private var selectedSolveFor: SolveFor = .monthlyPayment
+
     private func calculateMortgage() {
-        guard let loan = Double(loanAmount),
-              let r = Double(rate),
-              let t = Double(years) else { return }
+        guard let r = Double(rate), r > 0 else { return }
 
         let i = r / 100 / 12
-        let n = t * 12
-        let payment = (loan * i) / (1 - pow(1 + i, -n))
 
-        result = payment
+        switch selectedSolveFor {
+        case .monthlyPayment:
+            guard let loan = Double(loanAmount), let t = Double(years) else { return }
+            let n = t * 12
+            result = loan * i / (1 - pow(1 + i, -n))
+
+        case .loanTerm:
+            guard let loan = Double(loanAmount), let payment = Double(monthlyPayment), loan > 0, paymentValid(payment, loan, i) else { return }
+            let n = log(payment / (payment - loan * i)) / log(1 + i)
+            result = n / 12
+
+        case .interestRate, .loanAmount:
+            break // Additional implementations can go here
+        }
+    }
+
+    private func resetFields() {
+        loanAmount = ""
+        rate = ""
+        years = ""
+        monthlyPayment = ""
+        result = nil
+    }
+
+    private func paymentValid(_ payment: Double, _ loan: Double, _ i: Double) -> Bool {
+        payment > loan * i
     }
 }

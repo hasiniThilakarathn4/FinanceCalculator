@@ -42,7 +42,3 @@ struct HelpView: View {
         }
     }
 }
-
-#Preview {
-    HelpView()
-}

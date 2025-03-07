@@ -4,101 +4,137 @@
 //
 //  Created by Hasini Thilakarathna on 2025-02-28.
 //
-
 import SwiftUI
 
 struct CompoundInterestView: View {
-    @State private var principal: String = ""
-    @State private var rate: String = ""
-    @State private var years: String = ""
-    @State private var compoundingPeriods: String = ""
-    @State private var result: Double?
+    enum SolveFor: String, CaseIterable, Identifiable {
+        case futureValue
+        case presentValue
+        case interestRate
+        case timePeriod
 
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 20) {
-    
-                    
-                    // Input Section
-                    VStack(spacing: 15) {
-                        CustomTextField(placeholder: "Initial Investment ($)", text: $principal)
-                        CustomTextField(placeholder: "Annual Interest Rate (%)", text: $rate)
-                        CustomTextField(placeholder: "Years", text: $years)
-                        CustomTextField(placeholder: "Compounding Periods Per Year", text: $compoundingPeriods)
-                    }
-                    .padding()
-                    .background(RoundedRectangle(cornerRadius: 10).fill(Color(.systemGray6)))
-                    .padding(.horizontal)
-                    
-                    // Calculation Result
-                    if let result = result {
-                        VStack {
-                            Text("Future Value")
-                                .font(.headline)
-                                .foregroundColor(.gray)
-                            
-                            Text("$\(result, specifier: "%.2f")")
-                                .font(.title)
-                                .fontWeight(.bold)
-                                .foregroundColor(.blue)
-                        }
-                        .padding()
-                        .background(RoundedRectangle(cornerRadius: 10).fill(Color(.systemGray6))) // Result Box
-                        .padding(.horizontal)
-                    }
-                    
-                    // Calculate Button
-                    Button(action: calculateFutureValue) {
-                        Text("Calculate")
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(Color.blue)
-                            .foregroundColor(.white)
-                            .cornerRadius(10)
-                            .font(.headline)
-                    }
-                    .padding(.horizontal)
-                    
-                    Spacer()
-                }
-                .padding()
-            }
-            .navigationTitle("Compound Interest")
-            .background(Color(.systemBackground)) // Ensure tap is detected on background
-            .onTapGesture {
-                hideKeyboard() // ✅ Hide keyboard when tapping outside
+        var id: String { self.rawValue }
+
+        var displayName: String {
+            switch self {
+            case .futureValue: return "Future Value"
+            case .presentValue: return "Present Value"
+            case .interestRate: return "Interest Rate"
+            case .timePeriod: return "Time Period"
             }
         }
     }
 
-    private func calculateFutureValue() {
-        guard let p = Double(principal),
-              let r = Double(rate),
-              let t = Double(years),
-              let m = Double(compoundingPeriods) else { return }
+    @State private var selectedSolveFor: SolveFor = .futureValue
+    @State private var principal: String = ""
+    @State private var rate: String = ""
+    @State private var years: String = ""
+    @State private var compoundingPeriods: String = ""
+    @State private var futureValue: String = ""
 
-        let i = r / 100 / m
-        let n = t * m
-        let futureValue = p * pow((1 + i), n)
-
-        result = futureValue
-    }
-}
-
-// ✅ Custom Styled TextField Component
-struct CustomTextField: View {
-    var placeholder: String
-    @Binding var text: String
+    @State private var result: Double?
 
     var body: some View {
-        TextField(placeholder, text: $text)
-            .padding()
-            .background(RoundedRectangle(cornerRadius: 8).stroke(Color.gray, lineWidth: 1))
-            .keyboardType(.decimalPad)
-    }
-}
+        NavigationStack {
+            ZStack {
+                ThemeManager.backgroundGradient.edgesIgnoringSafeArea(.all)
+                ScrollView {
+                    VStack(spacing: 20) {
+                        Picker("Solve For", selection: $selectedSolveFor) {
+                            ForEach(SolveFor.allCases) { option in
+                                Text(option.displayName).tag(option)
+                            }
+                        }
+                        .pickerStyle(SegmentedPickerStyle())
+                        .padding()
 
-#Preview {
-    CompoundInterestView()
+                        VStack(spacing: 15) {
+                            if selectedSolveFor != .presentValue {
+                                CustomTextField(title: "Initial Investment ($)", placeholder: "$0.00", text: $principal)
+                            }
+                            if selectedSolveFor != .futureValue {
+                                CustomTextField(title: "Future Value ($)", placeholder: "$0.00", text: $futureValue)
+                            }
+                            if selectedSolveFor != .interestRate {
+                                CustomTextField(title: "Annual Interest Rate (%)", placeholder: "%", text: $rate)
+                            }
+                            if selectedSolveFor != .timePeriod {
+                                CustomTextField(title: "Duration (Years)", placeholder: "Years", text: $years)
+                            }
+
+                            CustomTextField(title: "Compounding Periods/Year", placeholder: "e.g., 12", text: $compoundingPeriods)
+                        }
+                        .cardBackground()
+
+                        if let result = result {
+                            ResultView(title: selectedSolveFor.displayName, value: formattedResult())
+                        }
+
+                        HStack {
+                            Button(action: calculate) {
+                                PrimaryButton(title: "Calculate")
+                            }
+
+                            Button(action: resetFields) {
+                                PrimaryButton(title: "Reset")
+                            }
+                        }
+                        .padding(.horizontal)
+
+                        Spacer()
+                    }
+                    .padding()
+                }
+                .navigationTitle("📈 Interest Calculator")
+                .onTapGesture { hideKeyboard() }
+            }
+        }
+    }
+
+    private func calculate() {
+        guard let m = Double(compoundingPeriods), m > 0 else { return }
+
+        switch selectedSolveFor {
+        case .futureValue:
+            guard let p = Double(principal), let r = Double(rate), let t = Double(years) else { return }
+            let i = r / 100 / m
+            result = p * pow((1 + i), m * t)
+
+        case .presentValue:
+            guard let fv = Double(futureValue), let r = Double(rate), let t = Double(years) else { return }
+            let i = r / 100 / m
+            let n = t * m
+            result = fv / pow((1 + i), n)
+
+        case .interestRate:
+            guard let p = Double(principal), let fv = Double(futureValue), let t = Double(years), p > 0, fv > 0 else { return }
+            let n = t * m
+            result = (pow(fv/p, 1/n) - 1) * m * 100
+
+        case .timePeriod:
+            guard let fv = Double(futureValue), let p = Double(principal), let r = Double(rate) else { return }
+            let i = r / 100 / m
+            result = log(fv / p) / (m * log(1 + i))
+        }
+    }
+
+    private func formattedResult() -> String {
+        switch selectedSolveFor {
+        case .futureValue, .presentValue:
+            return String(format: "$%.2f", result ?? 0)
+        case .interestRate:
+            return String(format: "%.2f%%", result ?? 0)
+        case .timePeriod:
+            return "\(String(format: "%.2f", result ?? 0)) years"
+        }
+    }
+
+    private func resetFields() {
+        principal = ""
+        rate = ""
+        years = ""
+        compoundingPeriods = ""
+        futureValue = ""
+        result = nil
+    }
 }
