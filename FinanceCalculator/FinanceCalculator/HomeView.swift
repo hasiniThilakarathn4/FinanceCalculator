@@ -61,7 +61,16 @@ struct HomeView: View {
                     }
                     .padding()
                 }
-                .navigationTitle("Home")
+                .navigationTitle("")
+                .toolbar {
+                    ToolbarItem(placement: .principal) {
+                        HStack {
+                            Image(systemName: "house.fill")
+                            Text("Home")
+                                .font(.headline)
+                        }
+                    }
+                }
                 .onTapGesture { hideKeyboard() }
             }
         }

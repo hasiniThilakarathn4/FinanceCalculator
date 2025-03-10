@@ -18,13 +18,16 @@ struct CustomTextField: View {
                 .font(.subheadline)
                 .foregroundColor(.gray)
             
-            TextField(placeholder, text: $text)
-                .padding()
-                .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color.gray, lineWidth: 1)
-                )
-                .keyboardType(.decimalPad)
+            TextField(placeholder, text: Binding(
+                get: { text },
+                set: { newValue in text = newValue.formattedWithCommas() }
+            ))
+            .padding()
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(Color.gray, lineWidth: 1)
+            )
+            .keyboardType(.decimalPad)
         }
     }
 }

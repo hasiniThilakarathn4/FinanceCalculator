@@ -4,7 +4,6 @@
 //
 //  Created by Hasini Thilakarathna on 2025-02-28.
 //
-
 import SwiftUI
 
 struct CompoundInterestView: View {
@@ -24,11 +23,11 @@ struct CompoundInterestView: View {
     }
 
     @State private var selectedSolveFor: SolveFor = .futureValue
-    @State private var principal: String = ""
-    @State private var rate: String = ""
-    @State private var years: String = ""
-    @State private var compoundingPeriods: String = ""
-    @State private var futureValue: String = ""
+    @State private var principal = ""
+    @State private var rate = ""
+    @State private var years = ""
+    @State private var compoundingPeriods = ""
+    @State private var futureValue = ""
 
     @State private var result: Double?
 
@@ -45,13 +44,16 @@ struct CompoundInterestView: View {
                         }
                         .pickerStyle(SegmentedPickerStyle())
                         .padding()
+                        .onChange(of: selectedSolveFor) {_, _ in
+                            result = nil  // ✅ Reset result when user switches picker
+                        }
 
                         VStack(spacing: 15) {
                             if selectedSolveFor != .presentValue {
-                                CustomTextField(title: "Initial Investment ($)", placeholder: "$0.00", text: $principal)
+                                CustomTextField(title: "Initial Investment (Rs)", placeholder: "Rs. 0.00", text: $principal)
                             }
                             if selectedSolveFor != .futureValue {
-                                CustomTextField(title: "Future Value ($)", placeholder: "$0.00", text: $futureValue)
+                                CustomTextField(title: "Future Value (Rs)", placeholder: "Rs. 0.00", text: $futureValue)
                             }
                             if selectedSolveFor != .interestRate {
                                 CustomTextField(title: "Annual Interest Rate (%)", placeholder: "%", text: $rate)
@@ -64,7 +66,7 @@ struct CompoundInterestView: View {
                         }
                         .cardBackground()
 
-                        if let result = result {
+                        if result != nil {
                             ResultView(title: selectedSolveFor.displayName, value: formattedResult())
                         }
 
@@ -83,30 +85,41 @@ struct CompoundInterestView: View {
                     }
                     .padding()
                 }
-                .navigationTitle("📈 Interest Calculator")
+                .navigationTitle("")
+                .toolbar {
+                    ToolbarItem(placement: .principal) {
+                        HStack {
+                            Image(systemName: "chart.line.uptrend.xyaxis") 
+                                .font(.headline)
+                            Text("Interest Calculator")
+                                .font(.headline)
+                        }
+                    }
+                }
                 .onTapGesture { hideKeyboard() }
             }
         }
     }
 
     private func calculate() {
-        guard let m = Double(compoundingPeriods), m > 0 else { return }
-
-        let i = (Double(rate) ?? 0) / 100 / m
-        let t = Double(years) ?? 0
-        let p = Double(principal) ?? 0
-        let fv = Double(futureValue) ?? 0
+        let p = Double(principal.replacingOccurrences(of: ",", with: "")) ?? 0
+        let r = (Double(rate.replacingOccurrences(of: ",", with: "")) ?? 0) / 100
+        let t = Double(years.replacingOccurrences(of: ",", with: "")) ?? 0
+        let fv = Double(futureValue.replacingOccurrences(of: ",", with: "")) ?? 0
+        let m = Double(compoundingPeriods.replacingOccurrences(of: ",", with: "")) ?? 1  // Default to 1 if empty
+        let i = r / m  // Periodic rate
+        let n = t * m  // Total periods
 
         switch selectedSolveFor {
         case .futureValue:
-            result = p * pow(1 + i, m * t)
+            result = p * pow(1 + i, n)
 
         case .presentValue:
-            result = fv / pow(1 + i, m * t)
+            result = fv / pow(1 + i, n)
 
         case .interestRate:
             guard p > 0, fv > 0 else { return }
-            result = (pow(fv / p, 1 / (m * t)) - 1) * m * 100
+            result = (pow(fv / p, 1 / n) - 1) * m * 100
 
         case .timePeriod:
             guard p > 0, fv > 0, i > 0 else { return }
@@ -117,11 +130,11 @@ struct CompoundInterestView: View {
     private func formattedResult() -> String {
         switch selectedSolveFor {
         case .futureValue, .presentValue:
-            return String(format: "$%.2f", result ?? 0)
+            return (result ?? 0).formattedCurrency()
         case .interestRate:
-            return String(format: "%.2f%%", result ?? 0)
+            return (result ?? 0).formattedPercentage()
         case .timePeriod:
-            return "\(String(format: "%.2f", result ?? 0)) years"
+            return (result ?? 0).formattedYears()
         }
     }
 

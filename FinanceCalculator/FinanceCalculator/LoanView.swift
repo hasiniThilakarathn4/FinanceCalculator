@@ -1,5 +1,5 @@
 //
-//  Untitled.swift
+//  LoanView.swift
 //  FinanceCalculator
 //
 //  Created by Hasini Thilakarathna on 2025-02-28.
@@ -29,12 +29,10 @@ struct LoanView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                ThemeManager.backgroundGradient
-                    .ignoresSafeArea()
+                ThemeManager.backgroundGradient.ignoresSafeArea()
 
                 ScrollView {
                     VStack(spacing: 20) {
-   
 
                         Picker("Solve for", selection: $selectedSolveFor) {
                             ForEach(SolveFor.allCases) { option in
@@ -43,14 +41,17 @@ struct LoanView: View {
                         }
                         .pickerStyle(SegmentedPickerStyle())
                         .padding(.horizontal)
+                        .onChange(of: selectedSolveFor) { _,_ in
+                            result = nil  // ✅ Reset result when user switches picker
+                        }
 
                         VStack(spacing: 15) {
                             if selectedSolveFor != .loanAmount {
-                                CustomTextField(title: "Loan Amount", placeholder: "$0.00", text: $loanAmount)
+                                CustomTextField(title: "Loan Amount", placeholder: "Rs. 0.00", text: $loanAmount)
                             }
 
                             if selectedSolveFor != .monthlyPayment {
-                                CustomTextField(title: "Monthly Payment", placeholder: "$0.00", text: $monthlyPayment)
+                                CustomTextField(title: "Monthly Payment", placeholder: "Rs. 0.00", text: $monthlyPayment)
                             }
 
                             if selectedSolveFor != .interestRate {
@@ -82,17 +83,26 @@ struct LoanView: View {
                     }
                     .padding()
                 }
-                .navigationTitle("Loans")
+                .navigationTitle("")
+                .toolbar {
+                    ToolbarItem(placement: .principal) {
+                        HStack {
+                            Image(systemName: "dollarsign.circle.fill") 
+                            Text("Loan Calculator")
+                                .font(.headline)
+                        }
+                    }
+                }
                 .onTapGesture { hideKeyboard() }
             }
         }
     }
 
     private func calculate() {
-        let p = Double(loanAmount) ?? 0
-        let payment = Double(monthlyPayment) ?? 0
-        let n = (Double(years) ?? 0) * 12 // Convert years to months
-        let r = (Double(rate) ?? 0) / 100 / 12 // Convert annual rate to monthly rate
+        let p = Double(loanAmount.replacingOccurrences(of: ",", with: "")) ?? 0
+        let payment = Double(monthlyPayment.replacingOccurrences(of: ",", with: "")) ?? 0
+        let n = (Double(years.replacingOccurrences(of: ",", with: "")) ?? 0) * 12 // Convert years to months
+        let r = (Double(rate.replacingOccurrences(of: ",", with: "")) ?? 0) / 100 / 12 // Convert annual rate to monthly rate
 
         switch selectedSolveFor {
         case .monthlyPayment:
@@ -112,7 +122,7 @@ struct LoanView: View {
             result = log(payment / (payment - p * r)) / log(1 + r) / 12 // Convert months to years
         }
     }
-    
+
     private func solveInterestRate(p: Double, payment: Double, n: Double) -> Double {
         var guess = 0.05 / 12 // Start with a 5% annual interest rate (monthly rate)
         let maxIterations = 100
@@ -121,7 +131,7 @@ struct LoanView: View {
         for _ in 0..<maxIterations {
             let denominator = 1 - pow(1 + guess, -n)
             guard denominator != 0 else { return 0 } // Prevent division by zero
-            
+
             let fx = payment - (p * guess) / denominator
             let fxPrime = (p * (pow(1 + guess, -n) * n) / denominator + p / denominator)
 
@@ -133,20 +143,16 @@ struct LoanView: View {
         return guess
     }
 
-
-
-
     private func formattedResult(_ value: Double) -> String {
         switch selectedSolveFor {
         case .interestRate:
-            return String(format: "%.2f%%", value) // Display as percentage
+            return (value).formattedPercentage()
         case .loanTerm:
-            return String(format: "%.1f years", value) // Display as years
+            return (value).formattedYears()
         default:
-            return String(format: "$%.2f", value) // Display currency format
+            return (value).formattedCurrency()
         }
     }
-
 
     private func resetFields() {
         loanAmount = ""
