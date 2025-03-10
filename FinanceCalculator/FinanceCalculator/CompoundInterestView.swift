@@ -4,14 +4,12 @@
 //
 //  Created by Hasini Thilakarathna on 2025-02-28.
 //
+
 import SwiftUI
 
 struct CompoundInterestView: View {
     enum SolveFor: String, CaseIterable, Identifiable {
-        case futureValue
-        case presentValue
-        case interestRate
-        case timePeriod
+        case futureValue, presentValue, interestRate, timePeriod
 
         var id: String { self.rawValue }
 
@@ -37,7 +35,7 @@ struct CompoundInterestView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                ThemeManager.backgroundGradient.edgesIgnoringSafeArea(.all)
+                ThemeManager.backgroundGradient.ignoresSafeArea()
                 ScrollView {
                     VStack(spacing: 20) {
                         Picker("Solve For", selection: $selectedSolveFor) {
@@ -94,26 +92,24 @@ struct CompoundInterestView: View {
     private func calculate() {
         guard let m = Double(compoundingPeriods), m > 0 else { return }
 
+        let i = (Double(rate) ?? 0) / 100 / m
+        let t = Double(years) ?? 0
+        let p = Double(principal) ?? 0
+        let fv = Double(futureValue) ?? 0
+
         switch selectedSolveFor {
         case .futureValue:
-            guard let p = Double(principal), let r = Double(rate), let t = Double(years) else { return }
-            let i = r / 100 / m
-            result = p * pow((1 + i), m * t)
+            result = p * pow(1 + i, m * t)
 
         case .presentValue:
-            guard let fv = Double(futureValue), let r = Double(rate), let t = Double(years) else { return }
-            let i = r / 100 / m
-            let n = t * m
-            result = fv / pow((1 + i), n)
+            result = fv / pow(1 + i, m * t)
 
         case .interestRate:
-            guard let p = Double(principal), let fv = Double(futureValue), let t = Double(years), p > 0, fv > 0 else { return }
-            let n = t * m
-            result = (pow(fv/p, 1/n) - 1) * m * 100
+            guard p > 0, fv > 0 else { return }
+            result = (pow(fv / p, 1 / (m * t)) - 1) * m * 100
 
         case .timePeriod:
-            guard let fv = Double(futureValue), let p = Double(principal), let r = Double(rate) else { return }
-            let i = r / 100 / m
+            guard p > 0, fv > 0, i > 0 else { return }
             result = log(fv / p) / (m * log(1 + i))
         }
     }

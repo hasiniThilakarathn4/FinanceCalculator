@@ -34,10 +34,7 @@ struct LoanView: View {
 
                 ScrollView {
                     VStack(spacing: 20) {
-                        Text("💳 Loan Calculator")
-                            .font(.title)
-                            .fontWeight(.bold)
-                            .foregroundColor(.blue)
+   
 
                         Picker("Solve for", selection: $selectedSolveFor) {
                             ForEach(SolveFor.allCases) { option in
@@ -92,38 +89,64 @@ struct LoanView: View {
     }
 
     private func calculate() {
-        let r = (Double(rate) ?? 0) / 100 / 12
-        let n = (Double(years) ?? 0) * 12
+        let p = Double(loanAmount) ?? 0
+        let payment = Double(monthlyPayment) ?? 0
+        let n = (Double(years) ?? 0) * 12 // Convert years to months
+        let r = (Double(rate) ?? 0) / 100 / 12 // Convert annual rate to monthly rate
 
         switch selectedSolveFor {
         case .monthlyPayment:
-            guard let loan = Double(loanAmount) else { return }
-            result = (loan * r) / (1 - pow(1 + r, -n))
+            guard p > 0, r > 0, n > 0 else { return }
+            result = (p * r) / (1 - pow(1 + r, -n))
 
         case .loanAmount:
-            guard let payment = Double(monthlyPayment) else { return }
+            guard payment > 0, r > 0, n > 0 else { return }
             result = payment * (1 - pow(1 + r, -n)) / r
 
         case .interestRate:
-            // Interest rate solving typically requires iterative methods (not straightforward), so placeholder.
-            result = nil
+            guard p > 0, payment > 0, n > 0 else { return }
+            result = solveInterestRate(p: p, payment: payment, n: n) * 12 * 100 // Convert to annual %
 
         case .loanTerm:
-            guard let loan = Double(loanAmount), let payment = Double(monthlyPayment) else { return }
-            result = log(payment / (payment - loan * r)) / log(1 + r) / 12
+            guard p > 0, payment > 0, r > 0 else { return }
+            result = log(payment / (payment - p * r)) / log(1 + r) / 12 // Convert months to years
         }
     }
+    
+    private func solveInterestRate(p: Double, payment: Double, n: Double) -> Double {
+        var guess = 0.05 / 12 // Start with a 5% annual interest rate (monthly rate)
+        let maxIterations = 100
+        let tolerance = 1e-6
+
+        for _ in 0..<maxIterations {
+            let denominator = 1 - pow(1 + guess, -n)
+            guard denominator != 0 else { return 0 } // Prevent division by zero
+            
+            let fx = payment - (p * guess) / denominator
+            let fxPrime = (p * (pow(1 + guess, -n) * n) / denominator + p / denominator)
+
+            let newGuess = guess - fx / fxPrime
+            if abs(newGuess - guess) < tolerance { return newGuess }
+
+            guess = newGuess
+        }
+        return guess
+    }
+
+
+
 
     private func formattedResult(_ value: Double) -> String {
         switch selectedSolveFor {
         case .interestRate:
-            return "Calculation requires advanced methods"
+            return String(format: "%.2f%%", value) // Display as percentage
         case .loanTerm:
-            return String(format: "%.1f years", value)
+            return String(format: "%.1f years", value) // Display as years
         default:
-            return String(format: "$%.2f", value)
+            return String(format: "$%.2f", value) // Display currency format
         }
     }
+
 
     private func resetFields() {
         loanAmount = ""
